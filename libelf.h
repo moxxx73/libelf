@@ -45,11 +45,22 @@ typedef struct elfh_struct{
     unsigned short e_shstrndx;
 } elf_hdr;
 
+typedef struct sym_tab_struct{
+    uint32_t st_name;
+    uint8_t st_info;
+    uint8_t st_other;
+    uint16_t st_shndx;
+    uint64_t st_value;
+    uint64_t st_size;
+} sym;
+
 typedef struct{
 	elf_hdr *hdr;
 	program_hdr **phdrs;
 	section_hdr **shdrs;
     char *shstrtab;
+    char *strtab;
+    sym **symtab;
 	char *fdata;
 	off_t fdata_size;
     uint64_t unused;

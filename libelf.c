@@ -136,7 +136,7 @@ char *str_shtype(uint32_t sh_type){
 	}
 }
 
-void free_ptr_array(void **array, int32_t length){
+void free_ptr_array(void **array, int64_t length){
 	int index = 0;
 	if(!array || (length <= 0) ) return;
 
@@ -162,6 +162,61 @@ void free_elf(ELF *elf){
 		free(elf);
 	}
 	return;
+}
+
+sym **load_symtab(ELF *elf, section_hdr *symsh){
+	sym **symtab = NULL;
+	int index = 0;
+	uint64_t offset = 0;
+	uint64_t size = 0;
+	uint64_t sym_count = 0;
+	char *datap = NULL;
+	if(!elf || !symsh) return NULL;
+	
+	datap = elf->fdata;
+	offset = symsh->sh_offset;
+	size = symsh->sh_size;
+	if((offset > elf->fdata_size) || ((offset+size) > elf->fdata_size)){
+		return NULL;
+	}
+	datap += offset;
+	sym_count = size/symsh->sh_entsize;
+	symtab = (sym **)malloc((sizeof(sym *)*sym_count+1));
+	if(!symtab){
+		fprintf(stderr, "load_symtab(): %s\n", strerror(errno));
+		return NULL;
+	}
+	memset(symtab, 0, (sizeof(sym *)*sym_count+1));
+	for(; index < sym_count; index++){
+		symtab[index] = (sym *)malloc(sizeof(sym));
+		if(!symtab){
+			fprintf(stderr, "load_symtab(): %s\n", strerror(errno));
+			goto LOAD_SYMTAB_ERR;
+		}
+		symtab[index]->st_name = *(uint32_t *)(datap);
+		datap += 4;
+		if(elf->hdr->e_ident[4] == ELFCLASS64){
+			symtab[index]->st_info = *(uint8_t *)(datap);
+			symtab[index]->st_other = *(uint8_t *)(datap+1);
+			symtab[index]->st_shndx = *(uint16_t *)(datap+2);
+			symtab[index]->st_value = *(uint64_t *)(datap+4);
+			symtab[index]->st_size = *(uint64_t *)(datap+12);
+			datap += 20;
+		}else{
+			symtab[index]->st_value = *(uint32_t *)(datap);
+			symtab[index]->st_size = *(uint32_t *)(datap+4);
+			symtab[index]->st_info = *(uint8_t *)(datap+8);
+			symtab[index]->st_other = *(uint8_t *)(datap+9);
+			symtab[index]->st_shndx = *(uint16_t *)(datap+10);
+			datap += 12;
+		}
+
+	}
+	return symtab;
+LOAD_SYMTAB_ERR:
+	free_ptr_array((void **)symtab, sym_count);
+	return NULL;
+
 }
 
 section_hdr **parse_shdrs(elf_hdr *hdr, char *fdata, int64_t fdata_size){
@@ -329,11 +384,36 @@ char *load_shstrtab(ELF *elf){
 	return NULL;
 }
 
+char *load_strtab(ELF *elf, uint64_t offset, uint64_t size){
+	char *strtab = NULL;
+	char *fdata = NULL;
+	off_t fdata_size = 0;
+	
+	if(elf && (offset > 0) && (size > 0)){
+		fdata = elf->fdata;
+		fdata_size = elf->fdata_size;
+
+		if((offset < fdata_size) || ((offset+size) < fdata_size)){
+			fdata += offset;
+			strtab = (char *)malloc(size);
+			if(!strtab){
+				fprintf(stderr, "load_strtab(): %s\n", strerror(errno));
+				return NULL;
+			}
+			memset(strtab, 0, size);
+			memcpy(strtab, fdata, size);
+			return strtab;
+		}
+	}
+	return NULL;
+}
+
 ELF *open_elf(char *filepath){
 	FILE *fp = NULL;
 	ELF *elf = NULL;
 	int64_t total_ph_size = 0;
-	int64_t total_sh_size = 0; 
+	int64_t total_sh_size = 0;
+	int sh_index = 0;
 	struct stat fp_stat;
 
 	if(!filepath){
@@ -413,6 +493,18 @@ ELF *open_elf(char *filepath){
 		default:
 			if(!(elf->shstrtab = load_shstrtab(elf))) fprintf(stderr, "open_elf(): Failed to load section header string table\n");
 			break;
+	}
+	for(; sh_index < elf->hdr->e_shnum; sh_index++){
+		switch(elf->shdrs[sh_index]->sh_type){
+			case SHT_SYMTAB:
+				elf->symtab = load_symtab(elf, elf->shdrs[sh_index]);
+				break;
+			case SHT_STRTAB:
+				if(sh_index != elf->hdr->e_shstrndx){
+					elf->strtab = load_strtab(elf, elf->shdrs[sh_index]->sh_offset, elf->shdrs[sh_index]->sh_size);
+				}
+				break;
+		}
 	}
 
 	return elf;
