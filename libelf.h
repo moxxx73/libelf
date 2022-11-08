@@ -58,6 +58,8 @@ char *str_abi(char abi);
 
 char *str_ptype(uint32_t type);
 
+char *str_shtype(uint32_t sh_type);
+
 void free_elf(ELF *elf);
 
 ELF *open_elf(char *filepath);

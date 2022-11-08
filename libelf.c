@@ -63,16 +63,90 @@ char *str_ptype(uint32_t type){
 	}
 }
 
-void free_phdrs(program_hdr **phdrs, int32_t phnum){
-	int index = 0;
-	if(!phdrs || (phnum <= 0) ) return;
+char *str_shtype(uint32_t sh_type){
+	switch(sh_type){
+		case SHT_NULL:
+			return "NULL";
+		case SHT_PROGBITS:
+			return "PROGBITS";
+		case SHT_SYMTAB:
+			return "SYMTAB";
+		case SHT_STRTAB:
+			return "STRTAB";
+		case SHT_RELA:
+			return "RELA";
+		case SHT_HASH:
+			return "HASH";
+		case SHT_DYNAMIC:
+			return "DYNAMIC";
+		case SHT_NOTE:
+			return "NOTE";
+		case SHT_NOBITS:
+			return "NOBITS";
+		case SHT_REL:
+			return "REL";
+		case SHT_SHLIB:
+			return "SHLIB";
+		case SHT_DYNSYM:
+			return "DYNSYM";
+		case SHT_INIT_ARRAY:
+			return "INIT_ARRAY";
+		case SHT_FINI_ARRAY:
+			return "FINI_ARRAY";
+		case SHT_PREINIT_ARRAY:
+			return "PREINIT_ARRAY";
+		case SHT_GROUP:
+			return "GROUP";
+		case SHT_SYMTAB_SHNDX:
+			return "SYMTAB_SHNDX";
+		case SHT_NUM:
+			return "NUM";
+		case SHT_LOOS:
+			return "LOOS";
+		case SHT_GNU_ATTRIBUTES:
+			return "GNU_ATTRIBUTES";
+		case SHT_GNU_HASH:
+			return "GNU_HASH";
+		case SHT_GNU_LIBLIST:
+			return "GNU_LIBLIST";
+		case SHT_CHECKSUM:
+			return "CHECKSUM";
+		case SHT_LOSUNW:
+			return "LOSUNW";
+		case SHT_SUNW_COMDAT:
+			return "SUNW_COMDAT";
+		case SHT_SUNW_syminfo:
+			return "SUNW_syminfo";
+		case SHT_GNU_verdef:
+			return "GNU_verdef";
+		case SHT_GNU_verneed:
+			return "GNU_verneed";
+		case SHT_GNU_versym:
+			return "GNU_versym";
+		case SHT_LOPROC:
+			return "LOPROC";
+		case SHT_HIPROC:
+			return "HIPROC";
+		case SHT_LOUSER:
+			return "LOUSER";
+		case SHT_HIUSER:
+			return "HIUSER";
+		default:
+			return "INVALID";
+	}
+}
 
-	for(; index < phnum; index++){
-		if(phdrs[index]){
-			free(phdrs[index]);
+void free_ptr_array(void **array, int32_t length){
+	int index = 0;
+	if(!array || (length <= 0) ) return;
+
+	for(; index < length; index++){
+		if(array[index]){
+			free(array[index]);
+			array[index] = NULL;
 		}
 	}
-	free(phdrs);
+	free(array);
 	return;
 }
 
@@ -80,14 +154,66 @@ void free_elf(ELF *elf){
 	if(elf){
 		if(elf->fdata) free(elf->fdata);
 		
-		if(elf->phdrs) free_phdrs(elf->phdrs, elf->hdr->e_phnum);
-		//if(elf->shdrs)
+		if(elf->phdrs) free_ptr_array((void **)elf->phdrs, elf->hdr->e_phnum);
+		if(elf->shdrs) free_ptr_array((void **)elf->shdrs, elf->hdr->e_shnum);
 
 		if(elf->hdr) free(elf->hdr);
 		memset(elf, 0, sizeof(ELF));
 		free(elf);
 	}
 	return;
+}
+
+section_hdr **parse_shdrs(elf_hdr *hdr, char *fdata, int64_t fdata_size){
+	char *dp = NULL;
+	int index = 0;
+	section_hdr **shdrs=NULL;
+	if(!hdr || !fdata || (fdata_size <= 0)){
+		fprintf(stderr, "parse_shdrs(): Bad arguments\n");
+		return NULL;
+	}
+	dp = (fdata+hdr->e_shoff);
+	shdrs = (section_hdr **)malloc((sizeof(section_hdr *)*(hdr->e_shnum+1)));
+	if(!shdrs){
+		fprintf(stderr, "parse_shdrs(): %s\n", strerror(errno));
+		return NULL;
+	}
+	memset(shdrs, 0, (sizeof(section_hdr *)*(hdr->e_shnum+1)));
+	for(; index < hdr->e_shnum; index++){
+		if(!(shdrs[index] = (section_hdr *)malloc(sizeof(section_hdr)))){
+			fprintf(stderr, "parse_shdrs(): %s\n", strerror(errno));
+			goto PARSE_SHDRS_ERR;
+		}
+		memset(shdrs[index], 0, sizeof(section_hdr));
+		shdrs[index]->sh_name = *(uint32_t *)(dp);
+		shdrs[index]->sh_type = *(uint32_t *)(dp+4);
+		dp += 8;
+		if(hdr->e_ident[4] == ELFCLASS64){
+			shdrs[index]->sh_flags = *(uint64_t *)(dp);
+			shdrs[index]->sh_addr = *(uint64_t *)(dp+8);
+			shdrs[index]->sh_offset = *(uint64_t *)(dp+16);
+			shdrs[index]->sh_size = *(uint64_t *)(dp+24);
+			shdrs[index]->sh_link = *(uint32_t *)(dp+32);
+			shdrs[index]->sh_info = *(uint32_t *)(dp+36);
+			shdrs[index]->sh_addralign = *(uint64_t *)(dp+40);
+			shdrs[index]->sh_entsize = *(uint64_t *)(dp+48);
+			dp += 56;
+		}else{
+			shdrs[index]->sh_flags = *(uint32_t *)(dp);
+			shdrs[index]->sh_addr = *(uint32_t *)(dp+4);
+			shdrs[index]->sh_offset = *(uint32_t *)(dp+8);
+			shdrs[index]->sh_size = *(uint32_t *)(dp+12);
+			shdrs[index]->sh_link = *(uint32_t *)(dp+16);
+			shdrs[index]->sh_info = *(uint32_t *)(dp+20);
+			shdrs[index]->sh_addralign = *(uint32_t *)(dp+24);
+			shdrs[index]->sh_entsize = *(uint32_t *)(dp+28);
+			dp += 32;
+		}
+	}
+	return shdrs;
+PARSE_SHDRS_ERR:
+	free_ptr_array((void **)shdrs, hdr->e_shnum);
+	return NULL;
 }
 
 program_hdr **parse_phdrs(elf_hdr *hdr, char *fdata, int64_t fdata_size){
@@ -98,6 +224,7 @@ program_hdr **parse_phdrs(elf_hdr *hdr, char *fdata, int64_t fdata_size){
 		fprintf(stderr, "parse_phdrs(): Bad arguments\n");
 		return NULL;
 	}
+	
 	dp = (fdata+hdr->e_phoff);
 	phdrs = (program_hdr **)malloc((sizeof(program_hdr *)*(hdr->e_phnum+1)));
 	if(!phdrs){
@@ -135,7 +262,7 @@ program_hdr **parse_phdrs(elf_hdr *hdr, char *fdata, int64_t fdata_size){
 	}
 	return phdrs;
 PARSE_PHDRS_ERR:
-	free_phdrs(phdrs, hdr->e_phnum);
+	free_ptr_array((void **)phdrs, hdr->e_phnum);
 	return NULL;
 }
 
@@ -254,6 +381,13 @@ ELF *open_elf(char *filepath){
 		fprintf(stderr, "open_elf(): Failed to parse program headers\n");
 		goto OPEN_ELF_ERR;
 	}
+	elf->shdrs = parse_shdrs(elf->hdr, elf->fdata, elf->fdata_size);
+	if(!elf->shdrs){
+		fprintf(stderr, "open_elf(): Failed to parse section headers\n");
+		goto OPEN_ELF_ERR;
+	}
+	
+
 	return elf;
 OPEN_ELF_ERR:
 	if(fp) fclose(fp);
