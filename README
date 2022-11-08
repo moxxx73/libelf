@@ -5,10 +5,9 @@ Support for:
   + Parsing 64 and 32 bit ELF headers
   + Parsing program headers (64-bit, 32-bit)
   + Parsing section headers (64-bit, 32-bit)
-  + Section header string table
+  + String and symbol table support
 
 To-Do:
-  + String and symbol table support
   + Relocation entry support
   + Dynamic tag support
   + Note support
