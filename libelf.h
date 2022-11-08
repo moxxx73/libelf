@@ -49,6 +49,7 @@ typedef struct{
 	elf_hdr *hdr;
 	program_hdr **phdrs;
 	section_hdr **shdrs;
+    char *shstrtab;
 	char *fdata;
 	off_t fdata_size;
     uint64_t unused;

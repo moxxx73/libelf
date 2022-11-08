@@ -310,6 +310,25 @@ PARSE_EHDR_ERR:
 	return NULL;
 }
 
+char *load_shstrtab(ELF *elf){
+	section_hdr *strtab_sect = NULL;
+	uint64_t sect_size = 0;
+	char *table = NULL;
+
+	if(elf->shdrs){
+		strtab_sect = elf->shdrs[elf->hdr->e_shstrndx];
+		sect_size = strtab_sect->sh_size;
+		if((strtab_sect->sh_offset > elf->fdata_size) && ((strtab_sect->sh_offset+sect_size) > elf->fdata_size)) return NULL;
+		if(!(table = (char *)malloc(sect_size))){
+			fprintf(stderr, "load_shstrtab(): %s\n", strerror(errno));
+			return NULL;
+		}
+		memcpy(table, (elf->fdata+strtab_sect->sh_offset), sect_size);
+		return table;
+	}
+	return NULL;
+}
+
 ELF *open_elf(char *filepath){
 	FILE *fp = NULL;
 	ELF *elf = NULL;
@@ -366,6 +385,7 @@ ELF *open_elf(char *filepath){
 		fprintf(stderr, "open_elf(): Failed to parse ELF header\n");
 		goto OPEN_ELF_ERR;
 	}
+
 	total_sh_size = elf->hdr->e_shentsize*elf->hdr->e_shnum;
 	total_ph_size = elf->hdr->e_phentsize*elf->hdr->e_phnum;
 	if((elf->hdr->e_phoff > elf->fdata_size) || (elf->hdr->e_shnum > elf->fdata_size)){
@@ -376,6 +396,7 @@ ELF *open_elf(char *filepath){
 		fprintf(stderr, "open_elf(): Invalid size in ELF header\n");
 		goto OPEN_ELF_ERR;
 	}
+
 	elf->phdrs = parse_phdrs(elf->hdr, elf->fdata, elf->fdata_size);
 	if(!elf->phdrs){
 		fprintf(stderr, "open_elf(): Failed to parse program headers\n");
@@ -386,7 +407,13 @@ ELF *open_elf(char *filepath){
 		fprintf(stderr, "open_elf(): Failed to parse section headers\n");
 		goto OPEN_ELF_ERR;
 	}
-	
+	switch(elf->hdr->e_shstrndx){
+		case SHN_UNDEF:
+			break;
+		default:
+			if(!(elf->shstrtab = load_shstrtab(elf))) fprintf(stderr, "open_elf(): Failed to load section header string table\n");
+			break;
+	}
 
 	return elf;
 OPEN_ELF_ERR:
