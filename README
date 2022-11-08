@@ -11,5 +11,9 @@ To-Do:
   + Relocation entry support
   + Dynamic tag support
   + Note support
-  
-All code is written following the elf(5) man page
+
+Note
+-----
+All code is written following the elf(5) man page and im working on developing
+a readelf clone to demonstrate, compare and verify functionality. For now tho
+im just inspecting the data structures with GDB
