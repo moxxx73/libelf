@@ -32,6 +32,20 @@ On success, elf_open() returns a pointer to an ELF structure (again, libelf.h),
 on error it will return NULL and write an error message to STDERR although this
 is subject to change in the future.
 
+ELF structure:
+
+  typedef struct{
+    elf_hdr *hdr;
+    program_hdr **phdrs;
+    section_hdr **shdrs;
+    char *shstrtab;
+    char *strtab;
+    sym **symtab;
+    char *fdata;
+    off_t fdata_size;
+    uint64_t unused;
+  } ELF
+
 libelf functionality
 ---------------------
 alot of libelf's code is hidden behind elf_open(), as i feel as though its too
