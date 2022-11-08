@@ -11,6 +11,8 @@ To-Do:
   + Relocation entry support
   + Dynamic tag support
   + Note support
+  + Still gotta add some integer-to-string functionality
+    for whenever certain values need to be outputted
 
 Note
 -----
