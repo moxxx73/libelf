@@ -18,3 +18,22 @@ Note
 All code is written following the elf(5) man page and im working on developing
 a readelf clone to demonstrate, compare and verify functionality. For now tho
 im just inspecting the data structures with GDB
+
+Usage
+------
+To open an ELF file you only need to use the following function:
+  
+  ELF *elf_open(char *filepath)
+
+This function will open and read the binary data within an ELF file
+and parse its data structures into an ELF structure (defined in libelf.h)
+
+On success, elf_open() returns a pointer to an ELF structure (again, libelf.h), 
+on error it will return NULL and write an error message to STDERR although this
+is subject to change in the future.
+
+libelf functionality
+---------------------
+alot of libelf's code is hidden behind elf_open(), as i feel as though its too
+risky to expose an interface to these functions by default and rather have open_elf()
+do any necessary sanity checks before parsing data structures by calling said functionality.
